@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>学習クイズメーカー v7.0 (修正版)</title>
+    <style>
+        :root {
+    --primary-color: #3f51b5;
+    --secondary-color: #ff9800;
+    --success-color: #4caf50;
+    --danger-color: #f44336;
+    --info-color: #03a9f4;
+    --light-gray: #f0f2f5;
+    --dark-text: #333;
+    --light-text: #fff;
+}
+        body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "Hiragino Kaku Gothic ProN", sans-serif;
+            background-color: var(--light-gray); color: var(--dark-text); margin: 0; padding: 15px; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; box-sizing: border-box;
+        }
+        #app-container { width: 100%; max-width: 500px; background-color: var(--light-text); border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; position: relative;
+        }
+        .screen { padding: 20px;
+            box-sizing: border-box; display: none;
+        }
+        .screen.active { display: block;
+        }
+        h1, h2, h3 { text-align: center; color: #1a237e; margin-top: 0;
+        }
+        .btn { display: block; width: 100%; padding: 15px; font-size: 1.1em; color: var(--light-text);
+            border: none; border-radius: 8px; cursor: pointer; text-align: center; box-sizing: border-box; margin-top: 15px; transition: background-color 0.2s;
+        }
+        .btn:hover:not(:disabled) { opacity: 0.9;
+        }
+        .btn-primary{background-color:var(--primary-color)} .btn-secondary{background-color:var(--secondary-color)}
+        .btn-success{background-color:var(--success-color)} .btn-danger{background-color:var(--danger-color)} .btn:disabled{background-color:#ccc;
+            cursor: not-allowed;}
+        input, select, textarea { width: 100%; padding: 10px; font-size: 1em;
+            border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box;
+        }
+        .settings-item { margin-bottom: 20px;
+        }
+        .settings-item label { display: block; margin-bottom: 8px; font-weight: bold;
+        }
+        .quiz-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;
+        }
+        .data-table-container { max-height: 35vh; overflow-y: auto; border: 1px solid #e0e0e0;
+            margin-top: 15px;}
+        table { width: 100%; border-collapse: collapse;
+        }
+        th, td { padding: 10px 8px; text-align: left; border-bottom: 1px solid #ddd;
+            font-size: 0.9em; vertical-align: middle;
+        }
+        th { background-color: #f2f2f2; position: sticky; top: 0;
+            z-index: 1; }
+        th.sortable { cursor: pointer;
+        }
+        th.sortable::after { content: ' '; display: inline-block; margin-left: 5px; opacity: 0.5;
+        }
+        th.sort-asc::after { content: '▲'; opacity: 1;
+        }
+        th.sort-desc::after { content: '▼'; opacity: 1;
+        }
+        .filter-group { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; padding: 10px;
+            background: #f9f9f9; border-radius: 8px; }
+        .filter-item { display: flex; flex-direction: column; flex-basis: 100%;
+        }
+        .filter-item label { font-size: 0.8em; font-weight: bold; margin-bottom: 4px;
+        }
+        .filter-item.count-filter { flex-direction: row; align-items: center; gap: 5px;
+        }
+        .porting-area { border: 2px solid var(--secondary-color); border-radius: 8px; padding: 15px; margin-top: 20px;
+        }
+        #loader { display: none; position: absolute; top: 0; left: 0; right: 0;
+            bottom: 0; background-color: rgba(255, 255, 255, 0.8); z-index: 1000; justify-content: center; align-items: center; font-size: 1.5em; color: var(--primary-color); font-weight: bold;
+        }
+        #toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 2000;
+            display: flex; flex-direction: column; align-items: center; gap: 10px; pointer-events: none;
+        }
+        .toast { padding: 12px 20px; color: white; border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2); opacity: 0; transform: translateY(-20px); transition: opacity 0.3s, transform 0.3s;
+        }
+        .toast.show { opacity: 1; transform: translateY(0);
+        }
+        .toast.success { background-color: var(--success-color); }
+        .toast.error { background-color: var(--danger-color); }
+        .modal { display: none; position: fixed; z-index: 1500; left: 0; top: 0;
+            width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center;
+        }
+        .modal.show { display: flex;
+        }
+        .modal-content { background-color: #fefefe; padding: 20px; border: 1px solid #888; width: 90%;
+            max-width: 500px; border-radius: 10px; }
+        .icon-btn { background: none; border: none; cursor: pointer; font-size: 1.2em; padding: 5px; vertical-align: middle; }
+        .icon-btn:hover { opacity: 0.7; }
+        .delete-btn { color: var(--danger-color); }
+        .edit-btn { color: var(--primary-color); }
+    </style>
+</head>
+<body>
+<div id="app-container">
+    <div id="loader">処理中...</div><div id="toast-container"></div>
+    <div id="export-modal" class="modal"><div class="modal-content"><h3 style="margin-top:0;">エクスポートする科目を選択</h3><div id="export-subject-list" style="max-height:200px;overflow-y:auto;border:1px solid #ccc;padding:10px;margin-bottom:15px;"></div><button data-action="export-selected" class="btn btn-secondary">選択した科目をエクスポート</button><button data-action="close-modal" class="btn" style="background-color:#666;">キャンセル</button></div></div>
+    <div id="delete-subject-modal" class="modal"><div class="modal-content"><h3 style="margin-top:0;">削除する科目を選択</h3><div id="delete-subject-list" style="max-height:200px;overflow-y:auto;border:1px solid #ccc;padding:10px;margin-bottom:15px;"></div><button data-action="delete-selected-subject" class="btn btn-danger">この科目を削除</button><button data-action="close-modal" class="btn" style="background-color:#666;">キャンセル</button></div></div>
+
+    <div id="settings-screen" class="screen">
+        <h1>学習クイズメーカー</h1>
+        <div class="settings-item"><label for="subject-filter">1. 科目を選択</label><select id="subject-filter"></select></div>
+        <div class="filter-group">
+            <div class="filter-item count-filter">
+                <label for="count-filter-mode-quiz">2. 正解数</label>
+                <select id="count-filter-mode-quiz"><option value="all">全て</option><option value="eq">=</option><option value="gte">&gt;=</option><option value="lte">&lt;=</option><option value="range">範囲</option></select>
+                <input type="number" id="count-filter-val1-quiz" min="0" style="display:none;">
+                <span id="range-span-quiz" style="display:none;">～</span>
+                <input type="number" id="count-filter-val2-quiz" min="0" style="display:none;">
+            </div>
+        </div>
+        <div class="settings-item"><label for="num-questions">3. 出題数</label><input type="number" id="num-questions" value="10" min="1"></div>
+        <button data-action="start-quiz" class="btn btn-success">クイズ開始</button>
+        <button data-action="goto-data-manager" class="btn btn-primary">問題データ管理</button>
+    </div>
+
+    <div id="quiz-screen" class="screen">
+        <div class="quiz-header"><h2 id="quiz-subject-title"></h2><button data-action="quit-quiz" class="btn" style="font-size:0.8em;padding:8px 12px;margin:0;width:auto;background-color:#757575;">トップに戻る</button></div>
+        <div style="width:100%;background-color:#e0e0e0;border-radius:5px;margin-bottom:20px;"><div id="progress-bar" style="width:0%;height:10px;background-color:var(--success-color);transition:width 0.3s;"></div></div>
+        <div id="question-area" style="min-height:120px;"></div><div id="options-container" style="display:grid;grid-template-columns:1fr;gap:12px;"></div>
+        <div id="explanation-container" style="margin-top:25px;padding:20px;background-color:#e8f5e9;border:1px solid #c8e6c9;border-radius:8px;display:none;"></div>
+        <div id="quiz-controls" style="display:flex;gap:10px;margin-top:20px;">
+            <button data-action="prev-question" class="btn btn-secondary">⏪ 戻る</button>
+            <button data-action="dont-know" class="btn" style="background-color:#757575;">🤔 わからない</button>
+            <button data-action="next-question" class="btn btn-primary" style="display:none;">次へ ⏩</button>
+        </div>
+    </div>
+    
+    <div id="data-manager-screen" class="screen">
+        <h2>問題データ管理</h2>
+        <div style="border:2px dashed var(--primary-color);border-radius:8px;padding:15px;text-align:center;margin:20px 0;">
+            <p style="margin-top:0;font-size:0.9em;">CSVファイルで一括登録</p>
+            <div style="display:flex;gap:10px;"><select id="csv-subject-select" style="flex:2;"></select><label class="btn btn-primary" style="margin-top:0;flex:1;padding:10px;font-size:1em;">ファイル選択<input type="file" id="csv-upload" accept=".csv" style="display:none;"></label></div>
+            <p style="font-size:0.8em; color:#666; margin-bottom:0; margin-top:10px;">ファイル形式: 問題,答え (1行に1問)</p>
+        </div>
+        <button data-action="add-new-word" class="btn btn-info">手動で問題を1つ追加（新しい科目も作れます）</button>
+        <div class="filter-group" style="margin-top:15px;">
+            <div class="filter-item"><label for="stats-subject-filter">科目</label><select id="stats-subject-filter"></select></div>
+            <div class="filter-item"><label for="count-filter-mode-stats">正解数</label><div class="count-filter" style="display:flex;"><select id="count-filter-mode-stats"><option value="all">全て</option><option value="eq">=</option><option value="gte">&gt;=</option><option value="lte">&lt;=</option><option value="range">範囲</option></select><input type="number" id="count-filter-val1-stats" min="0"><span id="range-span-stats" style="display:none;">～</span><input type="number" id="count-filter-val2-stats" style="display:none;" min="0"></div></div>
+        </div>
+        <div class="data-table-container"><table id="data-table"><thead><tr><th><input type="checkbox" data-action="select-all-checkbox"></th><th class="sortable" data-sort="word" data-action="sort">問題</th><th class="sortable" data-sort="japanese" data-action="sort">答え</th><th class="sortable" data-sort="correctCount" data-action="sort">正解数</th><th>操作</th></tr></thead><tbody></tbody></table></div>
+        <div style="margin-top:15px; display:flex; gap:10px;"><button data-action="delete-selected" class="btn btn-danger" disabled>選択した問題を削除</button><button data-action="delete-by-subject" class="btn btn-danger">科目ごと削除</button></div>
+        <div class="porting-area"><h3>データの引越し</h3><button data-action="open-export-modal" class="btn btn-secondary">科目を選んでエクスポート</button><label class="btn btn-success">データのインポート（復元）<input type="file" id="json-import" accept=".json" style="display:none;"></label></div>
+        <button data-action="goto-settings" class="btn" style="background-color:#666">トップに戻る</button>
+    </div>
+
+    <div id="edit-word-screen" class="screen">
+        <h3>問題の作成・編集</h3>
+        <form id="edit-word-form"><input type="hidden" id="edit-word-id"><datalist id="subject-list"></datalist>
+            <div class="settings-item"><label for="edit-subject">科目</label><input type="text" id="edit-subject" list="subject-list" required placeholder="新しい科目名を入力 or 既存の科目を選択"></div>
+            <div class="settings-item"><label for="edit-word">問題</label><input type="text" id="edit-word" required></div>
+            <div class="settings-item"><label for="edit-japanese">答え</label><input type="text" id="edit-japanese" required></div>
+            <hr><p style="text-align:center;color:#888;">--- 例文問題の場合（任意）---</p>
+            <div class="settings-item"><label for="edit-sentence">例文 (空所は () で)</label><textarea id="edit-sentence" rows="3" placeholder="例: This is a (pen)."></textarea></div>
+            <div class="settings-item"><label>選択肢 (1が正解)</label>
+                <input type="text" id="edit-option1" placeholder="選択肢1 (正解)" style="margin-bottom:5px;"><input type="text" id="edit-option2" placeholder="選択肢2" style="margin-bottom:5px;">
+                <input type="text" id="edit-option3" placeholder="選択肢3" style="margin-bottom:5px;"><input type="text" id="edit-option4" placeholder="選択肢4">
+            </div>
+            <button type="submit" data-action="save-word" class="btn btn-success">この内容で保存</button>
+            <button type="button" data-action="cancel-edit" class="btn btn-secondary">キャンセル</button>
+        </form>
+    </div>
+
+    <div id="result-screen" class="screen">
+        <h2>クイズ結果</h2>
+        <p style="text-align:center;font-size:1.5em;margin-bottom:20px;"><span id="score"></span> / <span id="total-questions"></span></p>
+        <p id="result-feedback" style="font-size:1.1em;text-align:center;font-weight:bold;margin-bottom:25px;"></p>
+        <button data-action="restart-quiz" class="btn btn-primary">もう一度解く</button><button data-action="goto-settings" class="btn btn-secondary">トップに戻る</button>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- 1. State Management ---
+    let allData = [];
+    let quizSession = {};
+    let currentSort = { column: 'word', direction: 'asc' };
+    const DB_KEY = 'quizMakerUltimateData_v7_0_fixed'; // Changed key to avoid conflict with old buggy data
+
+    // --- 2. DOM Elements ---
+    const appContainer = document.getElementById('app-container');
+    const loader = document.getElementById('loader');
+    const getEl = (id) => document.getElementById(id);
+    
+    // --- 3. Utility Functions ---
+    const showLoader = () => loader.style.display = 'flex';
+    const hideLoader = () => loader.style.display = 'none';
+
+    function showToast(message, type = 'success') {
+        const toastContainer = getEl('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`; // Use success or error class
+        toast.textContent = message;
+        toastContainer.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+                // Wait for fade out animation to finish before removing
+                setTimeout(() => toast.remove(), 500);
+            }, 3000);
+        }, 10);
+    }
+    
+    function loadData() {
+        try {
+            const storedData = localStorage.getItem(DB_KEY);
+            allData = storedData ? JSON.parse(storedData) : [];
+            if (!Array.isArray(allData)) allData = [];
+            let needsSave = false;
+            allData.forEach(item => {
+                if (!item.id) { item.id = self.crypto.randomUUID(); needsSave = true; }
+                if (item.correctCount === undefined) { item.correctCount = 0; needsSave = true; }
+            });
+            if (needsSave) saveData();
+        } catch (e) {
+            console.error("Failed to load data:", e);
+            allData = [];
+        }
+    }
+    function saveData() { 
+        try {
+            localStorage.setItem(DB_KEY, JSON.stringify(allData));
+        } catch (e) {
+            console.error("Failed to save data:", e);
+            showToast("データの保存に失敗しました。", "error");
+        }
+    }
+    function getSubjects() { return [...new Set(allData.map(item => item.subject))].sort((a,b) => a.localeCompare(b,'ja'));
+    }
+
+    function populateDropdown(selectId, options, withAllOption = false, placeholder = '全て') {
+        const select = getEl(selectId);
+        if (!select) return;
+        const currentVal = select.value;
+        select.innerHTML = '';
+        if (withAllOption) select.add(new Option(placeholder, 'all'));
+        options.forEach(subject => select.add(new Option(subject, subject)));
+        select.value = Array.from(select.options).some(opt => opt.value === currentVal) ? currentVal : (select.options[0]?.value || '');
+    }
+
+    // --- 4. Screen Management & UI Rendering ---
+    function showScreen(screenName) {
+        document.querySelectorAll('#app-container > .screen').forEach(s => s.classList.remove('active'));
+        const screen = getEl(screenName + '-screen');
+        if (screen) {
+            if (screenName === 'settings') {
+                populateAllSubjectDropdowns();
+            } else if (screenName === 'data-manager') {
+                populateAllSubjectDropdowns();
+                renderDataTable();
+            }
+            screen.classList.add('active');
+        }
+    }
+
+    function populateAllSubjectDropdowns() {
+        const subjects = getSubjects();
+        populateDropdown('subject-filter', subjects, true, '全ての科目');
+        populateDropdown('stats-subject-filter', subjects, true, '全ての科目');
+        populateDropdown('csv-subject-select', subjects, false);
+        const datalist = getEl('subject-list');
+        if(datalist) datalist.innerHTML = subjects.map(s => `<option value="${s}"></option>`).join('');
+    }
+
+    function setupFilterUI(suffix) {
+        const modeSelect = getEl(`count-filter-mode-${suffix}`);
+        const val1 = getEl(`count-filter-val1-${suffix}`);
+        const val2 = getEl(`count-filter-val2-${suffix}`);
+        const span = getEl(`range-span-${suffix}`);
+        if(!modeSelect || !val1 || !val2 || !span) return;
+        
+        const updateVisibility = () => {
+            const showVal1 = ['eq', 'gte', 'lte', 'range'].includes(modeSelect.value);
+            const showVal2 = modeSelect.value === 'range';
+            val1.style.display = showVal1 ? 'block' : 'none';
+            val2.style.display = showVal2 ? 'block' : 'none';
+            span.style.display = showVal2 ? 'inline' : 'none';
+        };
+        modeSelect.addEventListener('change', updateVisibility);
+        updateVisibility();
+    }
+
+    // <script> タグ内の renderDataTable 関数を以下のように修正
+
+function renderDataTable() {
+    [span_14](start_span)showLoader();[span_14](end_span)
+    setTimeout(() => {
+        try {
+            // ...（既存のフィルタリングとソート処理はそのまま）...
+            let filteredData = (getEl('stats-subject-filter').value === 'all') 
+                ? [...allData] : allData.filter(d => d.subject === getEl('stats-subject-filter').value);
+            filteredData = applyCorrectCountFilter(filteredData, 'stats');
+            [span_15](start_span)// ... ソートロジック ...[span_15](end_span)
+
+            const tbody = getEl('data-table').querySelector('tbody');
+            [span_16](start_span)tbody.innerHTML = '';[span_16](end_span)
+
+            if (filteredData.length === 0) {
+                // ...（データがない場合の表示はそのまま）...
+            } else {
+                [span_17](start_span)const fragment = document.createDocumentFragment();[span_17](end_span)
+                filteredData.forEach(item => {
+                    // --- 1. 通常表示の行 ---
+                    const tr = document.createElement('tr');
+                    tr.dataset.id = item.id;
+                    tr.style.cursor = "pointer"; // クリックできることを示唆
+                    tr.title = "クリックで例文を表示";
+
+                    // チェックボックス、問題、答え、正解数、操作ボタンのセルを作成（ここは既存とほぼ同じ）
+                    [span_18](start_span)// ...[span_18](end_span)
+                    const tdCheckbox = document.createElement('td');
+                    // ...
+                    tr.appendChild(tdCheckbox);
+                    // ...
+
+                    // --- 2. 詳細情報（例文）の行（初期は非表示） ---
+                    const detailsTr = document.createElement('tr');
+                    detailsTr.className = `details-row details-for-${item.id}`;
+                    detailsTr.style.display = 'none'; // 最初は隠しておく
+
+                    const detailsTd = document.createElement('td');
+                    detailsTd.colSpan = 5; // テーブルの全列にまたがるように設定
+                    detailsTd.style.padding = "10px 20px";
+                    detailsTd.style.backgroundColor = "#f9f9f9";
+                    detailsTd.innerHTML = item.sentence
+                        ? `<b>例文:</b> ${item.sentence.replace(/\((.*?)\)/g, '<strong>$1</strong>')}`
+                        : '<i>例文はありません。</i>';
+                    detailsTr.appendChild(detailsTd);
+
+                    fragment.appendChild(tr);
+                    fragment.appendChild(detailsTr);
+                });
+                tbody.appendChild(fragment);
+
+                // --- 3. クリックイベントの追加 ---
+                tbody.querySelectorAll('tr[data-id]').forEach(row => {
+                    row.addEventListener('click', (e) => {
+                        // 操作ボタンやチェックボックスのクリックは除外
+                        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') {
+                            return;
+                        }
+                        const detailsRow = tbody.querySelector(`.details-for-${row.dataset.id}`);
+                        if (detailsRow) {
+                            detailsRow.style.display = detailsRow.style.display === 'none' ? 'table-row' : 'none';
+                        }
+                    });
+                });
+            }
+            // ...（残りの処理）...
+        } catch (e) {
+            console.error(e);
+            [span_19](start_span)showToast("表の表示中にエラーが発生しました。", "error");[span_19](end_span)
+        } finally {
+            [span_20](start_span)hideLoader();[span_20](end_span)
+        }
+    }, 10);
+}
+
+
+    
+    // --- 5. Core Logic Functions (Implemented) ---
+    function applyCorrectCountFilter(data, suffix) {
+        const mode = getEl(`count-filter-mode-${suffix}`).value;
+        const val1 = parseInt(getEl(`count-filter-val1-${suffix}`).value, 10);
+        const val2 = parseInt(getEl(`count-filter-val2-${suffix}`).value, 10);
+
+        if (mode === 'all' || isNaN(val1)) return data;
+
+        switch (mode) {
+            case 'eq': return data.filter(d => d.correctCount === val1);
+            case 'gte': return data.filter(d => d.correctCount >= val1);
+            case 'lte': return data.filter(d => d.correctCount <= val1);
+            case 'range': return isNaN(val2) ? data : data.filter(d => d.correctCount >= val1 && d.correctCount <= val2);
+            default: return data;
+        }
+    }
+    
+    function openEditScreen(id = null) {
+        const form = getEl('edit-word-form');
+        form.reset();
+        getEl('edit-word-id').value = '';
+        if (id) {
+            const item = allData.find(d => d.id === id);
+            if (item) {
+                getEl('edit-word-id').value = item.id;
+                getEl('edit-subject').value = item.subject || '';
+                getEl('edit-word').value = item.word || '';
+                getEl('edit-japanese').value = item.japanese || '';
+                getEl('edit-sentence').value = item.sentence || '';
+                getEl('edit-option1').value = item.options?.[0] || '';
+                getEl('edit-option2').value = item.options?.[1] || '';
+                getEl('edit-option3').value = item.options?.[2] || '';
+                getEl('edit-option4').value = item.options?.[3] || '';
+            }
+        }
+        showScreen('edit-word');
+    }
+
+    function saveWord(e) {
+        e.preventDefault();
+        const id = getEl('edit-word-id').value;
+        const subject = getEl('edit-subject').value.trim();
+        const word = getEl('edit-word').value.trim();
+        const japanese = getEl('edit-japanese').value.trim();
+        if (!subject || !word || !japanese) {
+            showToast("科目、問題、答えは必須です。", "error");
+            return;
+        }
+        
+        const sentence = getEl('edit-sentence').value.trim();
+        const options = [
+            getEl('edit-option1').value.trim(), getEl('edit-option2').value.trim(),
+            getEl('edit-option3').value.trim(), getEl('edit-option4').value.trim()
+        ].filter(Boolean);
+
+        const newItemData = { subject, word, japanese, sentence, options };
+
+        if (id) {
+            const index = allData.findIndex(d => d.id === id);
+            if (index > -1) {
+                allData[index] = { ...allData[index], ...newItemData };
+            }
+        } else {
+            allData.push({ ...newItemData, id: self.crypto.randomUUID(), correctCount: 0 });
+        }
+        
+        saveData();
+        showToast("問題を保存しました。", "success");
+        showScreen('data-manager');
+    }
+
+    function deleteWord(id) {
+        if (confirm("この問題を本当に削除しますか？")) {
+            allData = allData.filter(d => d.id !== id);
+            saveData();
+            showToast("問題を削除しました。", "success");
+            renderDataTable();
+        }
+    }
+
+    function deleteSelectedWords() {
+        const selectedIds = [...document.querySelectorAll('#data-table .row-checkbox:checked')].map(cb => cb.dataset.id);
+        if (selectedIds.length === 0) {
+            showToast("問題が選択されていません。", "error");
+            return;
+        }
+        if (confirm(`${selectedIds.length}件の問題を本当に削除しますか？`)) {
+            allData = allData.filter(d => !selectedIds.includes(d.id));
+            saveData();
+            showToast(`${selectedIds.length}件の問題を削除しました。`, "success");
+            renderDataTable();
+        }
+    }
+    
+    function updateDeleteSelectedButtonState() {
+        const anyChecked = document.querySelector('#data-table .row-checkbox:checked');
+        getEl('delete-selected').disabled = !anyChecked;
+    }
+
+    function openDeleteSubjectModal() {
+        const subjects = getSubjects();
+        const listEl = getEl('delete-subject-list');
+        listEl.innerHTML = subjects.map(s => `<div><label><input type="radio" name="subject-to-delete" value="${s}"> ${s}</label></div>`).join('');
+        if (subjects.length > 0) {
+            listEl.querySelector('input').checked = true;
+            getEl('delete-subject-modal').classList.add('show');
+        } else {
+            showToast("削除できる科目がありません。", "info");
+        }
+    }
+
+    function handleDeleteBySubject() {
+        const selectedSubject = document.querySelector('input[name="subject-to-delete"]:checked')?.value;
+        if (selectedSubject && confirm(`科目「${selectedSubject}」とその中の全ての問題を削除します。本当によろしいですか？`)) {
+            allData = allData.filter(d => d.subject !== selectedSubject);
+            saveData();
+            showToast(`科目「${selectedSubject}」を削除しました。`, "success");
+            getEl('delete-subject-modal').classList.remove('show');
+            showScreen('data-manager');
+        }
+    }
+
+   // <script> タグ内の handleCSVImport 関数を以下のように修正
+
+function handleCSVImport(e) {
+    const file = e.target.files[0];
+    const subject = getEl('csv-subject-select').value;
+    if (!file || !subject) {
+        [span_5](start_span)showToast("ファイルと科目を選択してください。", "error");[span_5](end_span)
+        return;
+    }
+
+    [span_6](start_span)const reader = new FileReader();[span_6](end_span)
+    reader.onload = (event) => {
+        try {
+            const text = event.target.result;
+            [span_7](start_span)const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');[span_7](end_span)
+            let count = 0;
+            lines.forEach(line => {
+                // CSV行をカンマで分割
+                const parts = line.split(',');
+
+                // 最低でも問題と答えがあることを確認
+                if (parts.length >= 2) {
+                    const word = parts[0]?.trim() || '';
+                    const japanese = parts[1]?.trim() || '';
+                    const sentence = parts[2]?.trim() || ''; // 3列目を例文として取得
+                    // 4列目以降を選択肢として取得
+                    const options = parts.slice(3).map(opt => opt.trim()).filter(Boolean);
+
+                    if (word && japanese) {
+                        // 正しいデータ構造でオブジェクトを作成
+                        allData.push({
+                            id: self.crypto.randomUUID(),
+                            subject,
+                            word,
+                            japanese,
+                            correctCount: 0,
+                            sentence,
+                            options
+                        });
+                        count++;
+                    }
+                }
+            [span_8](start_span)});[span_8](end_span)
+
+            if (count > 0) {
+                [span_9](start_span)saveData();[span_9](end_span)
+                [span_10](start_span)showToast(`${count}件の問題を「${subject}」にインポートしました。`, "success");[span_10](end_span)
+                showScreen('data-manager');
+            } else {
+                [span_11](start_span)showToast("インポートできる有効なデータがありませんでした。", "error");[span_11](end_span)
+            }
+        } catch (err) {
+            [span_12](start_span)showToast("ファイルの処理中にエラーが発生しました。", "error");[span_12](end_span)
+            console.error(err);
+        }
+    };
+    reader.readAsText(file);
+    [span_13](start_span)e.target.value = '';[span_13](end_span)
+}
+
+    
+    function openExportModal() {
+        const subjects = getSubjects();
+        const listEl = getEl('export-subject-list');
+        listEl.innerHTML = subjects.map(s => `<div><label><input type="checkbox" name="subject-to-export" value="${s}"> ${s}</label></div>`).join('');
+        if (subjects.length > 0) {
+            getEl('export-modal').classList.add('show');
+        } else {
+            showToast("エクスポートできる科目がありません。", "info");
+        }
+    }
+
+    function handleSelectiveExport() {
+        const selectedSubjects = [...document.querySelectorAll('input[name="subject-to-export"]:checked')].map(cb => cb.value);
+        if (selectedSubjects.length === 0) {
+            showToast("エクスポートする科目を選択してください。", "error");
+            return;
+        }
+        const dataToExport = allData.filter(item => selectedSubjects.includes(item.subject));
+        exportDataAsJSON(dataToExport, `quiz_data_${selectedSubjects.join('_')}.json`);
+        getEl('export-modal').classList.remove('show');
+    }
+
+    function exportDataAsJSON(dataToExport, fileName = 'quiz_data_all.json') {
+        const blob = new Blob([JSON.stringify(dataToExport, null, 2)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast("データのエクスポートを開始しました。", "success");
+    }
+
+    function importDataFromJSON(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                if (!Array.isArray(importedData)) throw new Error("Invalid format");
+                
+                const currentIds = new Set(allData.map(item => item.id));
+                let newItems = 0;
+                let updatedItems = 0;
+                
+                importedData.forEach(item => {
+                    if (item.id && item.subject && item.word && item.japanese) {
+                        const existingIndex = allData.findIndex(d => d.id === item.id);
+                        if (existingIndex > -1) {
+                            allData[existingIndex] = { ...allData[existingIndex], ...item };
+                            updatedItems++;
+                        } else {
+                            allData.push(item);
+                            newItems++;
+                        }
+                    }
+                });
+                
+                saveData();
+                showToast(`インポート完了: ${newItems}件の新規追加, ${updatedItems}件の更新`, "success");
+                showScreen('data-manager');
+            } catch (err) {
+                showToast("JSONファイルのインポートに失敗しました。ファイル形式が正しいか確認してください。", "error");
+                console.error(err);
+            }
+        };
+        reader.readAsText(file);
+        event.target.value = ''; // Reset file input
+    }
+    
+    function startQuiz() {
+        showLoader();
+        const settings = {
+            subject: getEl('subject-filter').value,
+            numQuestions: parseInt(getEl('num-questions').value, 10),
+            filterSuffix: 'quiz'
+        };
+
+        let quizData = (settings.subject === 'all') ? [...allData] : allData.filter(d => d.subject === settings.subject);
+        quizData = applyCorrectCountFilter(quizData, settings.filterSuffix);
+        
+        if(quizData.length === 0) {
+            hideLoader();
+            showToast("クイズ対象の問題がありません。", "error");
+            return;
+        }
+
+        // Fisher-Yates shuffle
+        for (let i = quizData.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [quizData[i], quizData[j]] = [quizData[j], quizData[i]];
+        }
+        
+        const finalQuestions = quizData.slice(0, settings.numQuestions);
+        
+        quizSession = {
+            questions: finalQuestions,
+            currentIndex: 0,
+            answers: new Array(finalQuestions.length).fill(null), // null: unanswered, true: correct, false: incorrect
+            originalSettings: settings
+        };
+        
+        getEl('quiz-subject-title').textContent = settings.subject === 'all' ? '全ての科目' : settings.subject;
+        showScreen('quiz');
+        displayCurrentQuestion();
+        hideLoader();
+    }
+
+    function displayCurrentQuestion() {
+        const questionArea = getEl('question-area');
+        const optionsContainer = getEl('options-container');
+        const explanationContainer = getEl('explanation-container');
+        const progressBar = getEl('progress-bar');
+        
+        questionArea.innerHTML = '';
+        optionsContainer.innerHTML = '';
+        explanationContainer.style.display = 'none';
+
+        // Update progress bar
+        progressBar.style.width = `${(quizSession.currentIndex / quizSession.questions.length) * 100}%`;
+
+        if (quizSession.currentIndex >= quizSession.questions.length) {
+            showResult();
+            return;
+        }
+        
+        const item = quizSession.questions[quizSession.currentIndex];
+        
+        // Display question
+        const questionEl = document.createElement('h3');
+        questionEl.textContent = `問題 ${quizSession.currentIndex + 1}: ${item.word}`;
+        questionArea.appendChild(questionEl);
+
+        // Display options (if any)
+        if (item.options && item.options.length > 1) {
+            const shuffledOptions = [...item.options].sort(() => Math.random() - 0.5);
+            shuffledOptions.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-primary';
+                btn.textContent = opt;
+                btn.onclick = () => checkAnswer(opt);
+                optionsContainer.appendChild(btn);
+            });
+        }
+        
+        // Controls
+        getEl('dont-know').style.display = 'block';
+        getEl('next-question').style.display = 'none';
+        getEl('prev-question').disabled = quizSession.currentIndex === 0;
+    }
+    
+    function checkAnswer(selectedOption) {
+        const item = quizSession.questions[quizSession.currentIndex];
+        const isCorrect = selectedOption === (item.options?.[0] || item.japanese);
+        
+        quizSession.answers[quizSession.currentIndex] = isCorrect;
+        
+        if (isCorrect) {
+            const currentItem = allData.find(d => d.id === item.id);
+            if (currentItem) currentItem.correctCount++;
+        }
+        saveData();
+        showAnswer(isCorrect);
+    }
+    
+    function showAnswer(isCorrect = false) {
+        const item = quizSession.questions[quizSession.currentIndex];
+        const explanationContainer = getEl('explanation-container');
+        const optionsContainer = getEl('options-container');
+        
+        optionsContainer.querySelectorAll('button').forEach(btn => btn.disabled = true);
+
+        let feedback = '';
+        if (isCorrect) {
+            feedback = `<h4 style="color:var(--success-color);">正解！</h4>`;
+        } else {
+            feedback = `<h4 style="color:var(--danger-color);">不正解...</h4>`;
+        }
+        
+        explanationContainer.innerHTML = feedback + `<p><b>答え:</b> ${item.japanese}</p>` + (item.sentence ? `<p><b>例文:</b> ${item.sentence.replace(/\((.*?)\)/, '<b>$1</b>')}</p>` : '');
+        explanationContainer.style.display = 'block';
+        
+        // Controls
+        getEl('dont-know').style.display = 'none';
+        getEl('next-question').style.display = 'flex';
+        quizSession.answers[quizSession.currentIndex] = quizSession.answers[quizSession.currentIndex] ?? false; // Mark 'dont-know' as incorrect
+    }
+    
+    function handleNextQuestion() {
+        quizSession.currentIndex++;
+        if (quizSession.currentIndex < quizSession.questions.length) {
+            displayCurrentQuestion();
+        } else {
+            showResult();
+        }
+    }
+
+    function showPreviousQuestion() {
+        if (quizSession.currentIndex > 0) {
+            quizSession.currentIndex--;
+            displayCurrentQuestion();
+        }
+    }
+    
+    function showResult() {
+        const score = quizSession.answers.filter(a => a === true).length;
+        const total = quizSession.questions.length;
+        getEl('score').textContent = score;
+        getEl('total-questions').textContent = total;
+        
+        const percentage = total > 0 ? (score / total) * 100 : 0;
+        const feedbackEl = getEl('result-feedback');
+        if (percentage === 100) {
+            feedbackEl.textContent = "素晴らしい！全問正解です！";
+            feedbackEl.style.color = 'var(--success-color)';
+        } else if (percentage >= 70) {
+            feedbackEl.textContent = "おしい！あと少し！";
+            feedbackEl.style.color = 'var(--primary-color)';
+        } else {
+            feedbackEl.textContent = "お疲れ様でした。復習頑張りましょう！";
+            feedbackEl.style.color = 'var(--danger-color)';
+        }
+        
+        showScreen('result');
+    }
+
+
+    // --- 6. Master Event Listener & Initialization ---
+    function init() {
+        try {
+            appContainer.addEventListener('click', handleAppClick);
+            getEl('edit-word-form').addEventListener('submit', saveWord);
+            getEl('csv-upload').addEventListener('change', handleCSVImport);
+            getEl('json-import').addEventListener('change', importDataFromJSON);
+            
+            getEl('data-table').querySelector('tbody').addEventListener('change', e => { 
+                if(e.target.matches('.row-checkbox')) updateDeleteSelectedButtonState(); 
+            });
+            
+            const debouncedRender = (fn, delay) => { let t; return () => { clearTimeout(t); t = setTimeout(fn, delay); }};
+            const renderDebounced = debouncedRender(renderDataTable, 250);
+            
+            // Event listeners for DATA MANAGER filters ONLY
+            ['stats-subject-filter','count-filter-mode-stats'].forEach(id => getEl(id).addEventListener('change', renderDataTable));
+            ['count-filter-val1-stats','count-filter-val2-stats'].forEach(id => getEl(id).addEventListener('input', renderDebounced));
+
+            // Setup UI toggles for both screens
+            ['quiz', 'stats'].forEach(setupFilterUI);
+            
+            loadData();
+            showScreen('settings');
+        } catch (e) {
+            console.error("Initialization Failed:", e);
+            document.body.innerHTML = `
+                <div style="padding:20px; text-align:center;">
+                    <h1>アプリの起動に失敗しました。</h1>
+                    <p style="margin-bottom:20px;">お手数ですが、下のボタンを押して全データをリセットし、ページを再読み込みしてください。これで問題が解決するはずです。</p>
+                    <button onclick="localStorage.removeItem('${DB_KEY}'); location.reload();"
+                     class="btn btn-danger" style="display:inline-block; width:auto;">全データをリセットして再起動</button>
+                </div>`;
+        }
+    }
+    
+    function handleAppClick(e) {
+        const target = e.target.closest('[data-action]');
+        if (!target || target.disabled) return;
+        const action = target.dataset.action;
+        const id = target.dataset.id;
+
+        const actions = {
+            'start-quiz': startQuiz,
+            'goto-data-manager': () => showScreen('data-manager'),
+            'goto-settings': () => showScreen('settings'),
+            'add-new-word': () => openEditScreen(),
+            'edit-word': () => openEditScreen(id),
+            'delete-word': () => deleteWord(id),
+            'save-word': () => getEl('edit-word-form').requestSubmit(), // This triggers the 'submit' event
+            'cancel-edit': () => { if(confirm("編集をキャンセルしますか？")) showScreen('data-manager'); },
+            'delete-selected': deleteSelectedWords,
+            'delete-by-subject': openDeleteSubjectModal,
+            'delete-selected-subject': handleDeleteBySubject,
+            'open-export-modal': openExportModal,
+            'export-selected': handleSelectiveExport,
+            'close-modal': () => target.closest('.modal').classList.remove('show'),
+            'sort': () => {
+                const sortColumn = target.dataset.sort;
+                if (currentSort.column === sortColumn) {
+                    currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    currentSort.column = sortColumn;
+                    currentSort.direction = 'asc';
+                }
+                renderDataTable();
+            },
+            'select-all-checkbox': () => {
+                getEl('data-table').querySelectorAll('.row-checkbox').forEach(cb => cb.checked = target.checked);
+                updateDeleteSelectedButtonState();
+            },
+            'quit-quiz': () => { if(confirm('クイズを中断しますか？')) showScreen('settings'); },
+            'prev-question': showPreviousQuestion,
+            'next-question': handleNextQuestion,
+            'dont-know': showAnswer,
+            'restart-quiz': () => startQuiz(quizSession.originalSettings),
+        };
+        
+        if (actions[action]) {
+            actions[action]();
+        }
+    }
+    
+    init();
+});
+</script>
+</body>
+</html>
